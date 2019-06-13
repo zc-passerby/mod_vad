@@ -151,7 +151,7 @@ void switch_vad_reset(switch_vad_t *vad)
     return;
 }
 
-swith_vad_t *switch_vad_init(int sample_rate, int channels)
+switch_vad_t *switch_vad_init(int sample_rate, int channels)
 {
     switch_vad_t *vad = malloc(sizeof(switch_vad_t));
     if (!vad)
@@ -267,6 +267,108 @@ switch_vad_state_t switch_vad_process(switch_vad_t *vad, int16_t *data, unsigned
     return vad_state;
 }
 
+void switch_vad_destroy(switch_vad_t **vad)
+{
+    if (*vad)
+    {
+        if ((*vad)->vad_session)
+            yt_webrtc_destroy_vad_session((*vad)->vad_session);
+
+        if ((*vad)->media_buffer)
+        {
+            free((*vad)->media_buffer);
+            (*vad)->media_buffer = NULL;
+        }
+
+        free(*vad);
+        *vad = NULL;
+    }
+}
+
+static switch_bool_t fire_vad_event(switch_core_session_t *session, switch_vad_state_t vad_state)
+{
+    switch_event_t *event = NULL;
+    switch_channel_t *channel = switch_core_session_get_channel(session);
+
+    switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO, "Fire VAD event %d\n", vad_state);
+    switch_event_create_subclass(&event, SWITCH_EVENT_CUSTOM, VAD_EVENT_SUBCLASS);
+    if (event)
+    {
+        switch (vad_state)
+        {
+        case SWITCH_VAD_STATE_START_TALKING:
+            switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "vad_state", "start_talk");
+            break;
+        case SWITCH_VAD_STATE_STOP_TALKING:
+            switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "vad_state", "stop_talk");
+            break;
+        default:
+            break;
+        }
+        switch_channel_event_set_data(channel, event);
+        switch_event_fire(&event);
+    }
+    else
+    {
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "Failed to fire VAD Complete event %d\n", vad_state);
+    }
+
+    return SWITCH_TRUE;
+}
+
+static switch_bool_t vad_audio_callback(switch_media_bug_t *bug, void *user_data, switch_abc_type_t type)
+{
+    vad_session_t *vad = (vad_session_t *)user_data;
+    switch_core_session_t *session = vad->session;
+    switch_vad_state_t vad_state;
+    switch_frame_t *linear_frame;
+    uint32_t linear_len = 0;
+    switch_channel_t *channel = switch_core_session_get_channel(session);
+
+    if (!switch_channel_media_ready(channel))
+    {
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "Channel codec isn't ready\n");
+        return SWITCH_TRUE;
+    }
+
+    switch (type)
+    {
+    case SWITCH_ABC_TYPE_INIT:
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO, "Starting VAD detection for audio stream\n");
+        break;
+    case SWITCH_ABC_TYPE_CLOSE:
+        if (vad->read_resampler)
+            switch_resample_destroy(&vad->read_resampler);
+        if (vad->s_vad)
+            switch_vad_destroy(&vad->s_vad);
+        switch_core_media_bug_flush(bug);
+        switch_core_session_reset(session, SWITCH_TRUE, SWITCH_TRUE);
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO, "Stopping VAD detection for audio stream\n");
+        break;
+    case SWITCH_ABC_TYPE_READ:
+    case SWITCH_ABC_TYPE_READ_REPLACE:
+        linear_frame = switch_core_media_bug_get_read_replace_frame(bug);
+        linear_len = linear_frame->datalen;
+
+        vad_state = switch_vad_process(vad->s_vad, linear_frame->data, linear_len / 2);
+        if (vad_state == SWITCH_VAD_STATE_START_TALKING)
+        {
+            fire_vad_event(session, vad_state);
+            switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "START TALKING\n");
+        }
+        else if (vad_state == SWITCH_VAD_STATE_STOP_TALKING)
+        {
+            fire_vad_event(session, vad_state);
+            switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "STOP TALKING\n");
+        }
+        else if (vad_state == SWITCH_VAD_STATE_TALKING)
+            switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "State - TALKING\n");
+        break;
+    default:
+        break;
+    }
+}
+
 SWITCH_MODULE_LOAD_FUNCTION(mod_vad_load)
 {
     switch_application_interface_t *app_interface;
@@ -334,4 +436,34 @@ SWITCH_STANDARD_APP(vad_start_function)
     switch_assert(vad_session);
     memset(vad_session, 0, sizeof(*vad_session));
     vad_session->session = session;
+
+    switch_core_session_raw_read(session);
+    switch_core_session_get_read_impl(session, &imp);
+    switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO, "Read imp %u %u.\n", imp.samples_per_second, imp.number_of_channels);
+
+    s_vad = switch_vad_init(imp.samples_per_second, imp.number_of_channels);
+    switch_assert(s_vad);
+    switch_vad_set_param(s_vad, "vad_agn", globals.vad_agn);
+    switch_vad_set_param(s_vad, "vad_frame_time_width", globals.vad_frame_time_width);
+    switch_vad_set_param(s_vad, "vad_correlate", globals.vad_correlate);
+    switch_vad_set_param(s_vad, "ns_agn", globals.ns_agn);
+    switch_vad_set_param(s_vad, "check_frame_time_width", globals.check_frame_time_width);
+    switch_vad_set_param(s_vad, "slide_window_time_width", globals.slide_window_time_width);
+    switch_vad_set_param(s_vad, "start_talking_ratio", globals.start_talking_ratio);
+    switch_vad_set_param(s_vad, "stop_talking_ratio", globals.stop_talking_ratio);
+    switch_vad_create(s_vad);
+    vad_session->s_vad = s_vad;
+
+    flags = SMBF_READ_REPLACE | SMBF_ANSWER_REQ;
+    status = switch_core_media_bug_add(session, VAD_BUG_NAME_READ, NULL, vad_audio_callback, vad_session, 0, flags, &bug);
+
+    if (SWITCH_STATUS_SUCCESS != status)
+    {
+        switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "Failed to attach vad to media stream!\n");
+        return;
+    }
+
+    vad_session->read_bug = bug;
+    bug = NULL;
+    switch_channel_set_private(channel, VAD_PRIVATE, vad_session);
 }

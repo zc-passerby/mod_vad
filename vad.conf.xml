@@ -1,0 +1,12 @@
+<configuration name="vad.conf" description="mod_vad Configuration">
+  <settings>
+    <param name="vad_agn" value="3"/>
+    <param name="vad_frame_time_width" value="10"/>
+    <param name="vad_correlate" value="2"/>
+    <param name="ns_agn" value="3"/>
+    <param name="check_frame_time_width" value="600"/>
+    <param name="slide_window_time_width" value="200"/>
+    <param name="start_talking_ratio" value="70"/>
+    <param name="stop_talking_ratio" value="30"/>
+  </settings>
+</configuration>
