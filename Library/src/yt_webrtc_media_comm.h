@@ -1,5 +1,5 @@
-#ifndef __YUNFAN_WEBRTC_MEDIA_COMM_H__
-#define __YUNFAN_WEBRTC_MEDIA_COMM_H__
+#ifndef __YT_WEBRTC_MEDIA_COMM_H__
+#define __YT_WEBRTC_MEDIA_COMM_H__
 
 #ifdef __cplusplus
 extern "C" {

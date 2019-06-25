@@ -10,7 +10,7 @@
 typedef struct AudioBuffer
 {
     unsigned int samples_per_channel;
-    // ÊÇ·ñ·Ö¸ßµÍÆµ
+    // æ˜¯å¦åˆ†é«˜ä½é¢‘
     bool is_split;
     WebRtc_Word16 *data;
     WebRtc_Word16 low_pass_data[160];
@@ -180,7 +180,7 @@ static int HighPassFilter_Process(HighPassFilterState *hpf, WebRtc_Word16 *data,
     return NATIVE_AUDIO_ERR_SUCCESS;
 }
 
-typedef struct yunfan_webrtc_ns
+typedef struct yt_webrtc_ns
 {
     union
     {
@@ -195,13 +195,13 @@ typedef struct yunfan_webrtc_ns
     // filter high rate
     HighPassFilterState     hpf;
     short                   *tmp_frame;
-} yunfan_webrtc_ns;
+} yt_webrtc_ns;
 
-int yunfan_webrtc_ns_destroy(void *hnd)
+int yt_webrtc_ns_destroy(void *hnd)
 {
     if (hnd)
     {
-        yunfan_webrtc_ns *webrtc_ns = (yunfan_webrtc_ns*)hnd;
+        yt_webrtc_ns *webrtc_ns = (yt_webrtc_ns*)hnd;
         if (webrtc_ns->NS_inst)
         {
             WebRtcNs_Free(webrtc_ns->NS_inst);
@@ -218,27 +218,27 @@ int yunfan_webrtc_ns_destroy(void *hnd)
     return NATIVE_AUDIO_ERR_INVALID_PARAM;
 }
 
-int yunfan_webrtc_ns_create(unsigned int sample_rate, 
+int yt_webrtc_ns_create(unsigned int sample_rate, 
                             unsigned int channel_count,
                             unsigned int sample_per_frame,
                             int policy,
                             void **pp_hnd)
 {
-    yunfan_webrtc_ns *webrtc_ns = NULL;
+    yt_webrtc_ns *webrtc_ns = NULL;
     int status = NATIVE_AUDIO_ERR_SUCCESS;
 
-    if (// ²ÉÑùÂÊ±ØĞëÊÇ8000£¬16000£¬32000
+    if (// é‡‡æ ·ç‡å¿…é¡»æ˜¯8000ï¼Œ16000ï¼Œ32000
         (sample_rate != 8000 && sample_rate != 16000 && sample_rate != 32000) ||
-        // ±ØĞëÊÇµ¥ÉùµÀ
+        // å¿…é¡»æ˜¯å•å£°é“
         channel_count != 1 || 
-        // Ã¿Ò»Ö¡±ØĞë°üº¬n*10msµÄÒôÆµÊı¾İ
+        // æ¯ä¸€å¸§å¿…é¡»åŒ…å«n*10msçš„éŸ³é¢‘æ•°æ®
         sample_per_frame < sample_rate / 100 || sample_per_frame % (sample_rate / 100) > 0 || 
         policy < WEBRTC_NS_MILD || policy >= WEBRTC_NS_INVALID || !pp_hnd)
     {
         return NATIVE_AUDIO_ERR_INVALID_PARAM;
     }
 
-    webrtc_ns = (yunfan_webrtc_ns*)calloc(1, sizeof(yunfan_webrtc_ns));
+    webrtc_ns = (yt_webrtc_ns*)calloc(1, sizeof(yt_webrtc_ns));
     if (!webrtc_ns)
     {
         return NATIVE_AUDIO_ERR_NOENOUGH_MEMORY;
@@ -286,13 +286,13 @@ int yunfan_webrtc_ns_create(unsigned int sample_rate,
     return NATIVE_AUDIO_ERR_SUCCESS;
     
 error:
-    yunfan_webrtc_ns_destroy(webrtc_ns);
+    yt_webrtc_ns_destroy(webrtc_ns);
     return status;
 }
 
-int yunfan_webrtc_ns_frame_handle(void *hnd, const char *src_frame, char *dst_frame)
+int yt_webrtc_ns_frame_handle(void *hnd, const char *src_frame, char *dst_frame)
 {
-    yunfan_webrtc_ns *webrtc_ns = (yunfan_webrtc_ns*)hnd;
+    yt_webrtc_ns *webrtc_ns = (yt_webrtc_ns*)hnd;
     const short *src_frm = (const short*)src_frame;
     short *dst_frm = (short*)dst_frame;
     int status = NATIVE_AUDIO_ERR_SUCCESS;
@@ -304,12 +304,12 @@ int yunfan_webrtc_ns_frame_handle(void *hnd, const char *src_frame, char *dst_fr
     }
 
     media_copy_samples(webrtc_ns->tmp_frame, src_frm, webrtc_ns->samples_per_frame);
-    // ÒÔ10msÎªµ¥Î»£¬Ñ­»·´¦ÀíÒôÆµÊı¾İ
+    // ä»¥10msä¸ºå•ä½ï¼Œå¾ªç¯å¤„ç†éŸ³é¢‘æ•°æ®
     for (index = 0; index < webrtc_ns->samples_per_frame; index += webrtc_ns->samples_per_10ms_frame)
     {
         AudioBuffer_SetData(&(webrtc_ns->capture_audio_buffer), (WebRtc_Word16*)(webrtc_ns->tmp_frame + index));
 
-#if YUNFAN_WEBRTC_NS_USE_HIGH_PASS_FILER
+#if YT_WEBRTC_NS_USE_HIGH_PASS_FILER
         /* Apply high pass filer */
         HighPassFilter_Process(&(webrtc_ns->hpf),
                                AudioBuffer_GetLowPassData(&(webrtc_ns->capture_audio_buffer)),
@@ -333,11 +333,11 @@ int yunfan_webrtc_ns_frame_handle(void *hnd, const char *src_frame, char *dst_fr
     return status;
 }
 
-int yunfan_webrtc_nsx_destroy(void *hnd)
+int yt_webrtc_nsx_destroy(void *hnd)
 {
     if (hnd)
     {
-        yunfan_webrtc_ns *webrtc_ns = (yunfan_webrtc_ns*)hnd;
+        yt_webrtc_ns *webrtc_ns = (yt_webrtc_ns*)hnd;
         if (webrtc_ns->NSX_inst)
         {
             WebRtcNsx_Free(webrtc_ns->NSX_inst);
@@ -354,27 +354,27 @@ int yunfan_webrtc_nsx_destroy(void *hnd)
     return NATIVE_AUDIO_ERR_INVALID_PARAM;
 }
 
-int yunfan_webrtc_nsx_create(unsigned int sample_rate, 
+int yt_webrtc_nsx_create(unsigned int sample_rate, 
                              unsigned int channel_count,
                              unsigned int sample_per_frame,
                              int policy,
                              void **pp_hnd)
 {
-    yunfan_webrtc_ns *webrtc_ns = NULL;
+    yt_webrtc_ns *webrtc_ns = NULL;
     int status = NATIVE_AUDIO_ERR_SUCCESS;
 
-    if (// ²ÉÑùÂÊ±ØĞëÊÇ8000£¬16000£¬32000
+    if (// é‡‡æ ·ç‡å¿…é¡»æ˜¯8000ï¼Œ16000ï¼Œ32000
         (sample_rate != 8000 && sample_rate != 16000 && sample_rate != 32000) ||
-        // ±ØĞëÊÇµ¥ÉùµÀ
+        // å¿…é¡»æ˜¯å•å£°é“
         channel_count != 1 || 
-        // Ã¿Ò»Ö¡±ØĞë°üº¬n*10msµÄÒôÆµÊı¾İ
+        // æ¯ä¸€å¸§å¿…é¡»åŒ…å«n*10msçš„éŸ³é¢‘æ•°æ®
         sample_per_frame < sample_rate / 100 || sample_per_frame % (sample_rate / 100) > 0 || 
         policy < WEBRTC_NS_MILD || policy >= WEBRTC_NS_INVALID || !pp_hnd)
     {
         return NATIVE_AUDIO_ERR_INVALID_PARAM;
     }
 
-    webrtc_ns = (yunfan_webrtc_ns*)calloc(1, sizeof(yunfan_webrtc_ns));
+    webrtc_ns = (yt_webrtc_ns*)calloc(1, sizeof(yt_webrtc_ns));
     if (!webrtc_ns)
     {
         return NATIVE_AUDIO_ERR_NOENOUGH_MEMORY;
@@ -422,13 +422,13 @@ int yunfan_webrtc_nsx_create(unsigned int sample_rate,
     return NATIVE_AUDIO_ERR_SUCCESS;
     
 error:
-    yunfan_webrtc_nsx_destroy(webrtc_ns);
+    yt_webrtc_nsx_destroy(webrtc_ns);
     return status;
 }
 
-int yunfan_webrtc_nsx_frame_handle(void *hnd, const char *src_frame, char *dst_frame)
+int yt_webrtc_nsx_frame_handle(void *hnd, const char *src_frame, char *dst_frame)
 {
-    yunfan_webrtc_ns *webrtc_ns = (yunfan_webrtc_ns*)hnd;
+    yt_webrtc_ns *webrtc_ns = (yt_webrtc_ns*)hnd;
     const short *src_frm = (const short*)src_frame;
     short *dst_frm = (short*)dst_frame;
     int status = NATIVE_AUDIO_ERR_SUCCESS;
@@ -440,12 +440,12 @@ int yunfan_webrtc_nsx_frame_handle(void *hnd, const char *src_frame, char *dst_f
     }
 
     media_copy_samples(webrtc_ns->tmp_frame, src_frm, webrtc_ns->samples_per_frame);
-    // ÒÔ10msÎªµ¥Î»£¬Ñ­»·´¦ÀíÒôÆµÊı¾İ
+    // ä»¥10msä¸ºå•ä½ï¼Œå¾ªç¯å¤„ç†éŸ³é¢‘æ•°æ®
     for (index = 0; index < webrtc_ns->samples_per_frame; index += webrtc_ns->samples_per_10ms_frame)
     {
         AudioBuffer_SetData(&(webrtc_ns->capture_audio_buffer), (WebRtc_Word16*)(webrtc_ns->tmp_frame + index));
 
-#if YUNFAN_WEBRTC_NS_USE_HIGH_PASS_FILER
+#if YT_WEBRTC_NS_USE_HIGH_PASS_FILER
                 /* Apply high pass filer */
                 HighPassFilter_Process(&(webrtc_ns->hpf),
                                        AudioBuffer_GetLowPassData(&(webrtc_ns->capture_audio_buffer)),

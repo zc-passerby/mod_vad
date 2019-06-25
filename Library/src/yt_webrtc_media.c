@@ -12,25 +12,25 @@
 #define media_debug(format, ...)
 #endif
 
-typedef int (*yunfan_ns_create)(unsigned int sample_rate, unsigned int channel_count, 
+typedef int (*yt_ns_create)(unsigned int sample_rate, unsigned int channel_count, 
                                 unsigned int sample_per_frame, int policy, void **pp_hnd);
-typedef int (*yunfan_ns_destroy)(void *hnd);
-typedef int (*yunfan_ns_frame_handle)(void *hnd, const char *src_frame, char *dst_frame);
+typedef int (*yt_ns_destroy)(void *hnd);
+typedef int (*yt_ns_frame_handle)(void *hnd, const char *src_frame, char *dst_frame);
 
-typedef struct yunfan_ns_opt_t
+typedef struct yt_ns_opt_t
 {
-    yunfan_ns_create create;
-    yunfan_ns_destroy destroy;
-    yunfan_ns_frame_handle frame_handle;
-} yunfan_ns_opt;
+    yt_ns_create create;
+    yt_ns_destroy destroy;
+    yt_ns_frame_handle frame_handle;
+} yt_ns_opt;
 
-static const yunfan_ns_opt NativeWebrtcNsOpts[WEBRTC_MOLD_INVALID] = 
+static const yt_ns_opt NativeWebrtcNsOpts[WEBRTC_MOLD_INVALID] = 
 {
-    {yunfan_webrtc_ns_create, yunfan_webrtc_ns_destroy, yunfan_webrtc_ns_frame_handle},
-    {yunfan_webrtc_nsx_create, yunfan_webrtc_nsx_destroy, yunfan_webrtc_nsx_frame_handle},
+    {yt_webrtc_ns_create, yt_webrtc_ns_destroy, yt_webrtc_ns_frame_handle},
+    {yt_webrtc_nsx_create, yt_webrtc_nsx_destroy, yt_webrtc_nsx_frame_handle},
 };
 
-struct yunfan_vad_session_t
+struct yt_vad_session_t
 {
     // vad config
     int sample_rate;
@@ -41,7 +41,7 @@ struct yunfan_vad_session_t
     VadInst *vad_handle;
 
     // ns config
-    const yunfan_ns_opt *ns_opt;
+    const yt_ns_opt *ns_opt;
     void *ns_handle;
 
     // check frame
@@ -61,7 +61,7 @@ struct yunfan_vad_session_t
     int check_res_pos;
 };
 
-static void yunfan_vad_session_destroy(yunfan_vad_session *vad_session)
+static void yt_vad_session_destroy(yt_vad_session *vad_session)
 {
     if (vad_session)
     {
@@ -99,18 +99,18 @@ static void yunfan_vad_session_destroy(yunfan_vad_session *vad_session)
     }
 }
 
-static int yunfan_vad_res_length(const yunfan_vad_session *vad_session)
+static int yt_vad_res_length(const yt_vad_session *vad_session)
 {
     return vad_session ? vad_session->vad_res_length_per_frame : NATIVE_AUDIO_ERR_INVALID_PARAM;
 }
 
 // 时间参数以毫秒ms为单位
-static int yunfan_vad_session_create(int vad_agn, int vad_frame_time_width,
+static int yt_vad_session_create(int vad_agn, int vad_frame_time_width,
                                      int vad_correlate, int pre_ns, int ns_agn,
                                      int sample_rate, int check_frame_time_width,
-                                     int slide_window_time_width, yunfan_vad_session **vad_session)
+                                     int slide_window_time_width, yt_vad_session **vad_session)
 {
-    yunfan_vad_session *session = NULL;
+    yt_vad_session *session = NULL;
     int ret = NATIVE_AUDIO_ERR_SUCCESS;
 
     if (vad_agn < 0 || vad_agn > 3)
@@ -160,7 +160,7 @@ static int yunfan_vad_session_create(int vad_agn, int vad_frame_time_width,
         return NATIVE_AUDIO_ERR_INVALID_PARAM;
     }
 
-    session = (yunfan_vad_session*)calloc(1, sizeof(yunfan_vad_session));
+    session = (yt_vad_session*)calloc(1, sizeof(yt_vad_session));
     if (!session)
 
     {
@@ -217,11 +217,11 @@ static int yunfan_vad_session_create(int vad_agn, int vad_frame_time_width,
     return NATIVE_AUDIO_ERR_SUCCESS;
 
 error:
-    yunfan_vad_session_destroy(session);
+    yt_vad_session_destroy(session);
     return ret;
 }
 
-static int yunfan_vad_handle(VadInst *inst, int sample_rate, int vad_frame_time_width,
+static int yt_vad_handle(VadInst *inst, int sample_rate, int vad_frame_time_width,
                              const void *audio_stream, int audio_len, int *vad_res, int *res_len)
 {
     int index = 0;
@@ -268,7 +268,7 @@ static int yunfan_vad_handle(VadInst *inst, int sample_rate, int vad_frame_time_
     return NATIVE_AUDIO_ERR_SUCCESS;
 }
 
-static int yunfan_vad_operator(yunfan_vad_session *vad_session, const void *audio_stream, int audio_len, const int **check_res)
+static int yt_vad_operator(yt_vad_session *vad_session, const void *audio_stream, int audio_len, const int **check_res)
 {
     const void *pre_audio = NULL;
     int vad_res_length = 0;
@@ -303,7 +303,7 @@ static int yunfan_vad_operator(yunfan_vad_session *vad_session, const void *audi
     {
         case WEBRTC_VAD_CORRELATED:
         {
-            ret = yunfan_vad_handle(vad_session->vad_handle, vad_session->sample_rate, vad_session->vad_frame_time_width, pre_audio,
+            ret = yt_vad_handle(vad_session->vad_handle, vad_session->sample_rate, vad_session->vad_frame_time_width, pre_audio,
                                     vad_session->slide_window_bytes_width, vad_session->vad_check_res + vad_session->check_res_pos, &vad_res_length);
 
             if (ret == NATIVE_AUDIO_ERR_SUCCESS && vad_res_length == vad_session->vad_res_length_per_window)
@@ -356,7 +356,7 @@ static int yunfan_vad_operator(yunfan_vad_session *vad_session, const void *audi
                    pre_audio, vad_session->slide_window_bytes_width);
             vad_session->audio_stream_pos += vad_session->slide_window_bytes_width;
 
-            ret = yunfan_vad_handle(vad_session->vad_handle, vad_session->sample_rate, vad_session->vad_frame_time_width,
+            ret = yt_vad_handle(vad_session->vad_handle, vad_session->sample_rate, vad_session->vad_frame_time_width,
                                     vad_session->audio_stream_buffer + vad_session->audio_stream_pos, 
                                     vad_session->check_frame_bytes_width, vad_session->vad_check_res, &vad_res_length);
 
@@ -382,22 +382,22 @@ static int yunfan_vad_operator(yunfan_vad_session *vad_session, const void *audi
     }
 }
 
-yunfan_vad_session * yunfan_webrtc_create_vad_session(int vad_agn, int vad_frame_time_width,
+yt_vad_session * yt_webrtc_create_vad_session(int vad_agn, int vad_frame_time_width,
                                                     int vad_correlate, int pre_ns, int ns_agn, int sample_rate,
                                                     int check_frame_time_width, int slide_window_time_width)
 {
-    yunfan_vad_session * vad_session = NULL;
-    int ret = yunfan_vad_session_create(vad_agn, vad_frame_time_width, vad_correlate, pre_ns, ns_agn,
+    yt_vad_session * vad_session = NULL;
+    int ret = yt_vad_session_create(vad_agn, vad_frame_time_width, vad_correlate, pre_ns, ns_agn,
                                         sample_rate, check_frame_time_width, slide_window_time_width, &vad_session);
     return (ret == NATIVE_AUDIO_ERR_SUCCESS) ? vad_session : NULL;
 }
 
-void yunfan_webrtc_destroy_vad_session(yunfan_vad_session *session)
+void yt_webrtc_destroy_vad_session(yt_vad_session *session)
 {
-    yunfan_vad_session_destroy(session);
+    yt_vad_session_destroy(session);
 }
 
-int yunfan_webrtc_vad_operator(yunfan_vad_session *session, void *audio_stream, unsigned int audio_stream_length, int *result)
+int yt_webrtc_vad_operator(yt_vad_session *session, void *audio_stream, unsigned int audio_stream_length, int *result)
 {
     int index = 0;
     const int *vad_check_result = NULL;
@@ -407,7 +407,7 @@ int yunfan_webrtc_vad_operator(yunfan_vad_session *session, void *audio_stream, 
         return NATIVE_AUDIO_ERR_INVALID_PARAM;
     }
 
-    ret = yunfan_vad_operator(session, audio_stream, audio_stream_length, &vad_check_result);
+    ret = yt_vad_operator(session, audio_stream, audio_stream_length, &vad_check_result);
     if (ret != NATIVE_AUDIO_ERR_SUCCESS)
     {
         goto error;
@@ -423,7 +423,7 @@ error:
     return ret;
 }
 
-int yunfan_webrtc_vad_res_length(yunfan_vad_session *session)
+int yt_webrtc_vad_res_length(yt_vad_session *session)
 {
-    return yunfan_vad_res_length(session);
+    return yt_vad_res_length(session);
 }
