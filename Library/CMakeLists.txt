@@ -23,11 +23,11 @@ link_directories(/usr/local/lib)
 link_directories(/usr/local/freeswitch/lib/nsvad)
 
 # 查找指定目录下的所有源文件，并将名称保存到 DIR_SRC_FILES 变量中
-aux_source_directory(modules/audio_processing/aec/main/source DIR_SRC_FILES)
+#aux_source_directory(modules/audio_processing/aec/main/source DIR_SRC_FILES)
 aux_source_directory(modules/audio_processing/agc/main/source DIR_SRC_FILES)
 aux_source_directory(modules/audio_processing/utility DIR_SRC_FILES)
 aux_source_directory(common_audio/signal_processing_library/main/source DIR_SRC_FILES)
-# aux_source_directory(system_wrappers/source DIR_SRC_FILES)
+#aux_source_directory(system_wrappers/source DIR_SRC_FILES)
 aux_source_directory(modules/audio_processing/ns/main/source DIR_SRC_FILES)
 aux_source_directory(modules/audio_processing/vad/main/source DIR_SRC_FILES)
 aux_source_directory(src DIR_SRC_FILES)
@@ -48,3 +48,9 @@ target_link_libraries(nsvad swscale)
 target_link_libraries(nsvad avutil)
 target_link_libraries(nsvad vpx)
 target_link_libraries(nsvad v4l2)
+
+# 生成可执行文件
+add_executable(vadFile readconfig.c vadFile.c)
+target_compile_options(vadFile PRIVATE -std=c99)
+target_link_libraries(vadFile sndfile)
+target_link_libraries(vadFile nsvad)
